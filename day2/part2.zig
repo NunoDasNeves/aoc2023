@@ -22,40 +22,29 @@ pub fn main() !void {
 
     while (gameIt.next()) |game| {
         var gameNumIt = splitSequence(u8, game, ": ");
-        const gameStr = gameNumIt.next().?;
-
-        if (!std.mem.startsWith(u8, gameStr, "Game ")) {
-            unreachable;
-        }
-        const num = gameStr[5..];
-        const gameNum = try parseInt(usize, num, 10);
-        _ = gameNum;
-
-        const setsStr = gameNumIt.next().?;
-        var setIt = splitSequence(u8, setsStr, "; ");
+        _ = gameNumIt.next();
+        const sets_str = gameNumIt.next().?;
         var maxSet: [3]usize = .{ 0, 0, 0 };
-        while (setIt.next()) |set| {
-            var cubeIt = splitSequence(u8, set, ", ");
-
-            while (cubeIt.next()) |cube| {
-                var it = splitSequence(
-                    u8,
-                    cube,
-                    " ",
-                );
-                const numStr = it.next().?;
-                const numCubes = try parseInt(usize, numStr, 10);
-                const color = it.next().?;
-                const ch = color[0];
-                const index: u8 = switch (ch) {
-                    'r' => 0,
-                    'g' => 1,
-                    'b' => 2,
-                    else => unreachable,
-                };
-                if (numCubes > maxSet[index]) {
-                    maxSet[index] = numCubes;
-                }
+        var cube_it = tokenizeAny(u8, sets_str, ";,");
+        while (cube_it.next()) |cube_untrimmed| {
+            const cube = trim(u8, cube_untrimmed, " ");
+            var it = splitSequence(
+                u8,
+                cube,
+                " ",
+            );
+            const numStr = it.next().?;
+            const numCubes = try parseInt(usize, numStr, 10);
+            const color = it.next().?;
+            const ch = color[0];
+            const index: u8 = switch (ch) {
+                'r' => 0,
+                'g' => 1,
+                'b' => 2,
+                else => unreachable,
+            };
+            if (numCubes > maxSet[index]) {
+                maxSet[index] = numCubes;
             }
         }
         total += maxSet[0] * maxSet[1] * maxSet[2];
