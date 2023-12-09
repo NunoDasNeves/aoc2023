@@ -19,12 +19,12 @@ fn strTokSeq(str: []const u8, delimiters: []const u8) std.mem.TokenIterator(u8, 
     return tokenizeSequence(u8, str, delimiters);
 }
 
-fn strTokLine(str: []const u8) std.mem.TokenIterator(u8, .any) {
+fn strTokLine(str: []const u8) std.mem.TokenIterator(u8, .scalar) {
     const tokenizeScalar = std.mem.tokenizeScalar;
     return tokenizeScalar(u8, str, '\n');
 }
 
-fn strTokSpace(str: []const u8) std.mem.TokenIterator(u8, .any) {
+fn strTokSpace(str: []const u8) std.mem.TokenIterator(u8, .scalar) {
     const tokenizeScalar = std.mem.tokenizeScalar;
     return tokenizeScalar(u8, str, ' ');
 }
@@ -41,5 +41,9 @@ fn getInput() ![]const u8 {
 
 pub fn main() !void {
     const input = try getInput();
+    var line_it = strTokLine(input);
+    while (line_it.next()) |line| {
+        _ = line;
+    }
     print("{s}\n", .{input});
 }
