@@ -126,29 +126,9 @@ pub fn main() !void {
         }
     }
     print("{any}\n", .{multiples.items});
-    var lcm: usize = 0;
-    var iters: usize = 0;
-    while (true) {
-        lcm = multiples.items[0];
-        for (multiples.items) |mul| {
-            if (mul != lcm) {
-                break;
-            }
-        } else {
-            break;
-        }
-        var min_i: usize = 0;
-        for (multiples.items, 0..) |mul, i| {
-            if (mul < multiples.items[min_i]) {
-                min_i = i;
-            }
-        }
-        multiples.items[min_i] += start_nodes.items[min_i].cycle_len;
-        if (iters % 10000000 == 0) {
-            print("{any}\n", .{multiples.items});
-        }
-        iters += 1;
+    var lcm: usize = 1;
+    for (multiples.items) |mul| {
+        lcm = lcm * mul / std.math.gcd(lcm, mul);
     }
-    print("iters: {}\n", .{iters});
     print("{}\n", .{lcm});
 }
