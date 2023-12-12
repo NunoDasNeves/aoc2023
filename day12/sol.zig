@@ -39,13 +39,17 @@ fn getInput() ![]const u8 {
     return std.fs.cwd().readFileAlloc(m, args[1], std.math.maxInt(usize));
 }
 
-fn permute(springs: []const u8, possible: []u8, groups: []usize, num_broken: usize, idx: usize) usize {
+fn permute(memo: *std.hash_map.AutoHashMap([3]usize, usize), springs: []const u8, possible: []u8, groups: []usize, num_broken: usize, idx: usize) !usize {
     if (idx == springs.len) {
         if (groups.len > 0) {
             return 0;
         }
         //print("  {s}\n", .{possible});
         return 1;
+    }
+    const key = [3]usize{ groups.len, num_broken, idx };
+    if (memo.get(key)) |val| {
+        return val;
     }
 
     var count: usize = 0;
@@ -73,8 +77,9 @@ fn permute(springs: []const u8, possible: []u8, groups: []usize, num_broken: usi
         }
         //print("  {s}\n", .{springs});
         possible[idx] = ch;
-        count += permute(springs, possible, new_groups, new_num_broken, idx + 1);
+        count += try permute(memo, springs, possible, new_groups, new_num_broken, idx + 1);
     }
+    try memo.put(key, count);
 
     return count;
 }
@@ -115,11 +120,13 @@ fn solve(input: []const u8, part2: bool) !usize {
             try groups_arr.appendSlice(nums_arr.items);
         }
 
+        var memo = std.hash_map.AutoHashMap([3]usize, usize).init(m);
+        defer memo.deinit();
         const groups = groups_arr.items;
         const springs = springs_arr.items;
         const possible = possible_arr.items;
         //print("{s}, {any}\n", .{ springs, groups });
-        count += permute(springs, possible, groups, 0, 0);
+        count += try permute(&memo, springs, possible, groups, 0, 0);
     }
     return count;
 }
