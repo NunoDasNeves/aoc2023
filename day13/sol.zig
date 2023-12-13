@@ -3,50 +3,28 @@ const print = std.debug.print;
 const parseInt = std.fmt.parseInt;
 const parseUnsigned = std.fmt.parseUnsigned;
 
-const trim = std.mem.trim;
+const util = @import("util.zig");
+
 const ascii = std.ascii;
 
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const m = gpa.allocator();
 
-fn strTokAny(str: []const u8, delimiters: []const u8) std.mem.TokenIterator(u8, .any) {
-    const tokenizeAny = std.mem.tokenizeAny;
-    return tokenizeAny(u8, str, delimiters);
-}
-
-fn strTokSeq(str: []const u8, delimiters: []const u8) std.mem.TokenIterator(u8, .sequence) {
-    const tokenizeSequence = std.mem.tokenizeSequence;
-    return tokenizeSequence(u8, str, delimiters);
-}
-
-fn strTokLine(str: []const u8) std.mem.TokenIterator(u8, .scalar) {
-    const tokenizeScalar = std.mem.tokenizeScalar;
-    return tokenizeScalar(u8, str, '\n');
-}
-
-fn strTokSpace(str: []const u8) std.mem.TokenIterator(u8, .scalar) {
-    const tokenizeScalar = std.mem.tokenizeScalar;
-    return tokenizeScalar(u8, str, ' ');
-}
-
-fn strTrim(str: []const u8, values: []const u8) []const u8 {
-    return trim(u8, str, values);
-}
-
-fn getInput() ![]const u8 {
-    const args = try std.process.argsAlloc(m);
-    defer std.process.argsFree(m, args);
-    return std.fs.cwd().readFileAlloc(m, args[1], std.math.maxInt(usize));
-}
-
-fn find_pattern(nums: []u64, mul: usize) ?usize {
+fn findPattern(nums: []u64, errors: usize) ?usize {
     var start: usize = 0;
+    //print("nums {any}\n", .{nums});
     while (start < nums.len - 1) : (start += 1) {
         var i: usize = start;
         var j: usize = start + 1;
         var flag: bool = false;
+        var err_count: usize = 0;
         while (true) {
-            if (nums[i] != nums[j]) {
+            var bits: u64 = nums[i] ^ nums[j];
+            while (bits != 0) : (err_count += 1) {
+                bits &= bits - 1;
+            }
+            //print("[{} {}] bits: {b} errs: {}\n", .{ nums[i], nums[j], nums[i] & ~nums[j], err_count });
+            if (err_count > errors) {
                 break;
             }
             if (i == 0 or j >= nums.len - 1) {
@@ -56,32 +34,28 @@ fn find_pattern(nums: []u64, mul: usize) ?usize {
             i -= 1;
             j += 1;
         }
-        //print("{} {}\n", .{ i, j });
-        if (flag) {
-            //print("start {}\n", .{start});
-            return (start + 1) * mul;
+        //print("errors {}\n", .{err_count});
+
+        if (flag and err_count == errors) {
+            return start + 1;
         }
     }
     return null;
 }
 
-pub fn main() !void {
-    const input = try getInput();
-    var pat_it = strTokSeq(input, "\n\n");
+fn solve(input: []const u8, part2: bool) !usize {
+    var pat_it = util.strTokSeq(input, "\n\n");
     var total: usize = 0;
+
     while (pat_it.next()) |_pat| {
-        const pat_str = strTrim(_pat, "\n ");
+        const pat_str = util.strTrim(_pat, "\n ");
         var pat_arr = std.ArrayList([]const u8).init(m);
         defer pat_arr.deinit();
-        var line_it = strTokLine(pat_str);
+        var line_it = util.strTokLine(pat_str);
         while (line_it.next()) |line| {
             try pat_arr.append(line);
         }
         const pat = pat_arr.items;
-        //for (pat) |line| {
-        //    print("{s}\n", .{line});
-        //}
-        //print("\n", .{});
         if (pat.len > 64 or pat[0].len > 64) {
             unreachable;
         }
@@ -110,14 +84,22 @@ pub fn main() !void {
         }
         const cols = col_arr.items;
 
-        //print("{any}\n", .{rows});
-        //print("{any}\n", .{cols});
-
-        if (find_pattern(rows, 100)) |num| {
-            total += num;
-        } else if (find_pattern(cols, 1)) |num| {
-            total += num;
+        const col_1 = findPattern(cols, if (part2) 1 else 0);
+        const row_1 = findPattern(rows, if (part2) 1 else 0);
+        if (col_1) |c| {
+            total += c;
+        } else if (row_1) |r| {
+            total += r * 100;
+        } else {
+            unreachable;
         }
     }
-    print("{}\n", .{total});
+    return total;
+}
+
+pub fn main() !void {
+    const input = try util.getInput();
+
+    print("{}\n", .{try solve(input, false)});
+    print("{}\n", .{try solve(input, true)});
 }
