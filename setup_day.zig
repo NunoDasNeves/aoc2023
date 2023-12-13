@@ -27,13 +27,16 @@ pub fn main() !void {
     try std.fs.cwd().makePath(dirname);
     const daydir = try std.fs.cwd().openDir(dirname, .{});
 
-    for (1..3) |p| {
-        const partfile = try std.fmt.allocPrint(m, "part{}.zig", .{p});
-        defer m.free(partfile);
-        if (daydir.statFile(partfile)) |_| {} else |_| {
-            try std.fs.cwd().copyFile("template.zig", daydir, partfile, .{});
-            print("create {s}\n", .{partfile});
-        }
+    const solfile = "sol.zig";
+    if (daydir.statFile(solfile)) |_| {} else |_| {
+        try std.fs.cwd().copyFile("template.zig", daydir, solfile, .{});
+        print("copy {s} to {s}/{s}\n", .{ "template.zig", daydir, solfile });
+    }
+
+    const utilfile = "util.zig";
+    if (daydir.statFile(utilfile)) |_| {} else |_| {
+        try std.fs.cwd().copyFile("util.zig", daydir, utilfile, .{});
+        print("copy {s} to {s}/{s}\n", .{ "util.zig", daydir, utilfile });
     }
 
     const input_url = try std.fmt.allocPrint(m, "https://adventofcode.com/2023/day/{}/input", .{daynum});
