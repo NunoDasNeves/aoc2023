@@ -30,13 +30,13 @@ pub fn main() !void {
     const solfile = "sol.zig";
     if (daydir.statFile(solfile)) |_| {} else |_| {
         try std.fs.cwd().copyFile("template.zig", daydir, solfile, .{});
-        print("copy {s} to {s}/{s}\n", .{ "template.zig", daydir, solfile });
+        print("copy {s} to {s}/{s}\n", .{ "template.zig", dirname, solfile });
     }
 
     const utilfile = "util.zig";
     if (daydir.statFile(utilfile)) |_| {} else |_| {
         try std.fs.cwd().copyFile("util.zig", daydir, utilfile, .{});
-        print("copy {s} to {s}/{s}\n", .{ "util.zig", daydir, utilfile });
+        print("copy {s} to {s}/{s}\n", .{ "util.zig", dirname, utilfile });
     }
 
     const input_url = try std.fmt.allocPrint(m, "https://adventofcode.com/2023/day/{}/input", .{daynum});
