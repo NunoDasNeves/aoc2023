@@ -61,28 +61,7 @@ fn tilt(grid: [][]u8, dir: usize) void {
     }
 }
 
-fn solve(input: []const u8, part2: bool) !usize {
-    var line_it = util.strTokLine(input);
-    var grid_arr = std.ArrayList([]u8).init(m);
-    while (line_it.next()) |line| {
-        const row = try m.alloc(u8, line.len);
-        @memcpy(row, line);
-        try grid_arr.append(row);
-    }
-    const grid = grid_arr.items;
-    for (grid) |row| {
-        print("{s}\n", .{row});
-    }
-    print("\n", .{});
-    if (part2) {
-        for (0..1000000000) |_| {
-            for (0..4) |i| {
-                tilt(grid, i);
-            }
-        }
-    } else {
-        tilt(grid, 0);
-    }
+fn get_load(grid: [][]u8) usize {
     var load: usize = 0;
     for (grid, 0..) |row, r| {
         for (row) |ch| {
@@ -91,14 +70,83 @@ fn solve(input: []const u8, part2: bool) !usize {
             }
         }
     }
+    return load;
+}
+
+const Ctx = struct {
+    pub fn hash(self: @This(), grid: [][]u8) u64 {
+        _ = self;
+        var ret: u64 = 0;
+        for (grid) |row| {
+            ret ^= std.hash.CityHash64.hash(row);
+        }
+        return ret;
+    }
+    pub fn eql(self: @This(), a: [][]u8, b: [][]u8) bool {
+        _ = self;
+        for (a, 0..) |row_a, r| {
+            for (row_a, 0..) |ch_a, c| {
+                if (ch_a != b[r][c]) {
+                    return false;
+                }
+            }
+        }
+        return true;
+    }
+};
+
+fn solve(input: []const u8, part2: bool) !usize {
+    var map = std.HashMap([][]u8, usize, Ctx, 80).init(m);
+    var line_it = util.strTokLine(input);
+    var grid_arr = std.ArrayList([]u8).init(m);
+    while (line_it.next()) |line| {
+        const row = try m.alloc(u8, line.len);
+        @memcpy(row, line);
+        try grid_arr.append(row);
+    }
+    const grid = try grid_arr.toOwnedSlice();
     for (grid) |row| {
         print("{s}\n", .{row});
     }
-    return load;
+    print("\n", .{});
+    if (part2) {
+        var loads = std.ArrayList(usize).init(m);
+        var loop_start: usize = 0;
+        var loop_len: usize = 0;
+        for (0..1000) |i| {
+            for (0..4) |j| {
+                tilt(grid, j);
+            }
+            try loads.append(get_load(grid));
+            if (map.get(grid)) |idx| {
+                loop_start = idx;
+                loop_len = i - idx;
+                break;
+            }
+            const copy = try m.alloc([]u8, grid.len);
+            for (copy, 0..) |*row, r| {
+                row.* = try m.alloc(u8, grid[0].len);
+                @memcpy(row.*, grid[r]);
+            }
+            try (map.put(copy, i));
+            print("{}: {}\n", .{ i, get_load(grid) });
+        }
+        print("loop start: {}\nloop len:{}\n", .{ loop_start, loop_len });
+        const offset: usize = (1000000000 - (loop_start + 1)) % loop_len;
+        const load = loads.items[loop_start + offset];
+        print("offset: {}\n", .{offset});
+        return load;
+    }
+
+    tilt(grid, 0);
+    //for (grid) |row| {
+    //    print("{s}\n", .{row});
+    //}
+    return get_load(grid);
 }
 
 pub fn main() !void {
     const input = try util.getInput();
-    print("{}\n", .{try solve(input, false)});
-    //print("{}\n", .{try solve(input, true)});
+    //print("{}\n", .{try solve(input, false)});
+    print("{}\n", .{try solve(input, true)});
 }
