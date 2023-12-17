@@ -2,17 +2,18 @@ const std = @import("std");
 const print = std.debug.print;
 const parseInt = std.fmt.parseInt;
 const parseUnsigned = std.fmt.parseUnsigned;
-
-const util = @import("util.zig");
-
+const AL = std.ArrayList;
+const HM = std.AutoHashMap;
 const ascii = std.ascii;
 
+const u = @import("util.zig");
+
 var gpa = std.heap.GeneralPurposeAllocator(.{}){};
-const m = gpa.allocator();
+const heap = gpa.allocator();
 
 fn solve(input: []const u8, part2: bool) !usize {
     var total: usize = 0;
-    var line_it = util.strTokLine(input);
+    var line_it = u.strTokLine(input);
 
     while (line_it.next()) |line| {
         total += 1;
@@ -25,7 +26,7 @@ fn solve(input: []const u8, part2: bool) !usize {
 }
 
 pub fn main() !void {
-    const input = try util.getInput();
-    print("{s}\n", .{try solve(input, false)});
-    //print("{s}\n", .{try solve(input, true)});
+    const input = try u.getInput();
+    print("{}\n", .{try solve(input, false)});
+    //print("{}\n", .{try solve(input, true)});
 }
