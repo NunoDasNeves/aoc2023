@@ -93,18 +93,30 @@ fn solve(input: []const u8, part2: bool) !usize {
             if (curr.d == d) {
                 n = curr.n + 1;
             }
-
-            if (n > 3) {
-                continue;
-            }
-            //if (explored.get(next_p)) |_| {
-            //    continue;
-            //}
             const next: Snoo = .{
                 .p = next_p,
                 .n = n,
                 .d = d,
             };
+            if (part2) {
+                const is_end = next_p[0] == end_pos[0] and next_p[1] == end_pos[1];
+                //print("is_end: {any}\n", .{is_end});
+                if (curr.d != d and curr.n < 4) {
+                    //print("skip {any}\n", .{next});
+                    continue;
+                }
+                if (is_end and n < 4) {
+                    continue;
+                }
+                if (n > 10) {
+                    //print("skip {any}\n", .{next});
+                    continue;
+                }
+            } else {
+                if (n > 3) {
+                    continue;
+                }
+            }
 
             var add: bool = true;
             const g = dist.get(curr).? + grid[next_p[0]][next_p[1]];
@@ -122,20 +134,14 @@ fn solve(input: []const u8, part2: bool) !usize {
             }
         }
     }
-    //var it = prev.iterator();
-    //while (it.next()) |a| {
-    //    print("{any} -> {any}\n", .{ a.value_ptr.*, a.key_ptr.* });
-    //}
-    //total = dist.get(end_pos).?;
 
-    var path_pts = std.AutoHashMap([2]usize, usize).init(m);
+    // print map with path
+    var path_pts = std.AutoHashMap([2]usize, Snoo).init(m);
     var path = std.ArrayList([2]usize).init(m);
     var curr = end;
     while (!(curr.p[0] == 0 and curr.p[1] == 0)) {
         try path.append(curr.p);
-        try path_pts.put(curr.p, undefined);
-        //total += grid[curr[0]][curr[1]];
-        print("PATH {}\n", .{curr});
+        try path_pts.put(curr.p, curr);
         const pre = prev.get(curr).?;
         if (pre) |preee| {
             curr = preee;
@@ -147,23 +153,26 @@ fn solve(input: []const u8, part2: bool) !usize {
     for (grid, 0..) |row, r| {
         for (row, 0..) |n, c| {
             const p = .{ r, c };
-            if (path_pts.get(p)) |_| {
-                print("#", .{});
+            if (path_pts.get(p)) |pt| {
+                const ch: u8 = switch (pt.d) {
+                    .N => '^',
+                    .W => '<',
+                    .S => 'v',
+                    .E => '>',
+                };
+                print("{c}", .{ch});
             } else {
                 print("{}", .{n});
             }
         }
         print("\n", .{});
     }
-    print("\n", .{});
-
-    if (part2) {}
 
     return total;
 }
 
 pub fn main() !void {
     const input = try util.getInput();
-    print("{}\n", .{try solve(input, false)});
-    //print("{}\n", .{try solve(input, true)});
+    print("\nheat loss: {}\n\n", .{try solve(input, false)});
+    print("\nheat loss: {}\n\n", .{try solve(input, true)});
 }
