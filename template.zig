@@ -1,4 +1,5 @@
 const std = @import("std");
+const assert = std.debug.assert;
 const print = std.debug.print;
 const parseInt = std.fmt.parseInt;
 const parseUnsigned = std.fmt.parseUnsigned;
