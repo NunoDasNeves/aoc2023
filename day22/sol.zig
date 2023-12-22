@@ -13,6 +13,7 @@ var gpa = std.heap.GeneralPurposeAllocator(.{}){};
 const heap = gpa.allocator();
 
 const Id = i32;
+const MapType = std.AutoArrayHashMap(Id, struct { a: [3]usize, b: [3]usize });
 
 var next_id: Id = 0;
 
@@ -54,9 +55,65 @@ fn printAxis(grid: [][][]Id, axis: usize, depth: usize) void {
     }
 }
 
+// brick_removed must support supported_brick
+fn supported(map: MapType, grid: [][][]Id, supported_brick: Id, removed_map: *std.AutoArrayHashMap(Id, void)) bool {
+    const above_v = map.get(supported_brick).?;
+    const min_z = above_v.a[0];
+    assert(min_z > 1);
+    for (above_v.a[1]..above_v.b[1]) |y| {
+        for (above_v.a[2]..above_v.b[2]) |x| {
+            const below_id = grid[min_z - 1][y][x];
+            assert(below_id != supported_brick);
+            if (below_id == -1 or removed_map.contains(below_id)) {
+                continue;
+            }
+            return true;
+        }
+    }
+    return false;
+}
+
+fn num_fall(map: MapType, grid: [][][]Id, brick_removed: Id, removed_map: *std.AutoArrayHashMap(Id, void)) !usize {
+    var supports = std.AutoArrayHashMap(Id, void).init(heap);
+    defer (supports.deinit());
+    var total: usize = 0;
+    const v = map.get(brick_removed).?;
+    const above_z = v.b[0];
+
+    if (above_z >= grid.len) {
+        return 0;
+    }
+    assert(above_z > 1);
+
+    //print("try remove {c}, above_z: {}\n", .{ id_to_ch(k), above_z });
+    for (v.a[1]..v.b[1]) |y| {
+        for (v.a[2]..v.b[2]) |x| {
+            const above_id = grid[above_z][y][x];
+            //print("{} {} {}\n", .{ above_z, y, x });
+            assert(above_id != brick_removed);
+            if (above_id == -1) {
+                continue;
+            }
+            //print("  {c} supports {c}\n", .{ id_to_ch(k), id_to_ch(above_id) });
+            try supports.put(above_id, undefined);
+        }
+    }
+    if (supports.count() == 0) {
+        return 0;
+    }
+    try removed_map.put(brick_removed, undefined);
+    for (supports.keys()) |supported_k| {
+        if (!supported(map, grid, supported_k, removed_map)) {
+            total += try num_fall(map, grid, supported_k, removed_map) + 1;
+        }
+    }
+
+    return total;
+}
+
 fn solve(input: []const u8, part2: bool) !usize {
     var total: usize = 0;
-    var map = std.AutoArrayHashMap(Id, struct { a: [3]usize, b: [3]usize }).init(heap);
+    var map = MapType.init(heap);
 
     var line_it = u.strTokLine(input);
     //var grid_arr = std.ArrayList()
@@ -85,8 +142,8 @@ fn solve(input: []const u8, part2: bool) !usize {
         }
         try map.put(id, .{ .a = a, .b = b });
     }
-    print("min: {any}\nmax: {any}\n", .{ min, max });
-    print("max mul: {}\n", .{max[0] * max[1] * max[2]});
+    //print("min: {any}\nmax: {any}\n", .{ min, max });
+    //print("max mul: {}\n", .{max[0] * max[1] * max[2]});
     // REMEMBER Z, Y, X
     var grid: [][][]Id = try heap.alloc([][]Id, max[0]);
     for (0..max[0]) |z| {
@@ -98,7 +155,7 @@ fn solve(input: []const u8, part2: bool) !usize {
         }
         grid[z] = ymem;
     }
-    print("grid size: {} {} {}\n", .{ grid.len, grid[0].len, grid[0][0].len });
+    //print("grid size: {} {} {}\n", .{ grid.len, grid[0].len, grid[0][0].len });
     var mass: usize = 0;
     for (map.keys()) |k| {
         const v = map.get(k).?;
@@ -184,61 +241,22 @@ fn solve(input: []const u8, part2: bool) !usize {
     //printAxis(grid, 1, 0);
     //printAxis(grid, 1, 1);
     //printAxis(grid, 1, 2);
-    var supports = std.AutoArrayHashMap(Id, void).init(heap);
-    block: for (map.keys()) |k| {
-        supports.clearRetainingCapacity();
-        const v = map.get(k).?;
-        const above_z = v.b[0];
-        if (above_z >= grid.len) {
-            print("  disintegrate {c}\n", .{id_to_ch(k)});
-            total += 1;
-            continue :block;
+    var removed_map = std.AutoArrayHashMap(Id, void).init(heap);
+    if (part2) {
+        for (map.keys()) |k| {
+            removed_map.clearRetainingCapacity();
+            const num = try num_fall(map, grid, k, &removed_map);
+            //print("removing {c} would cause {} to fall\n", .{ id_to_ch(k), num });
+            total += num;
         }
-        assert(above_z > 0);
-        print("try disintegrating {c}, above_z: {}\n", .{ id_to_ch(k), above_z });
-        for (v.a[1]..v.b[1]) |y| {
-            for (v.a[2]..v.b[2]) |x| {
-                const above_id = grid[above_z][y][x];
-                //print("{} {} {}\n", .{ above_z, y, x });
-                assert(above_id != k);
-                if (above_id == -1) {
-                    continue;
-                }
-                print("  {c} supports {c}\n", .{ id_to_ch(k), id_to_ch(above_id) });
-                try supports.put(above_id, undefined);
+    } else {
+        for (map.keys()) |k| {
+            removed_map.clearRetainingCapacity();
+            if (try num_fall(map, grid, k, &removed_map) == 0) {
+                total += 1;
             }
         }
-        if (supports.count() == 0) {
-            print("  disintegrate {c}\n", .{id_to_ch(k)});
-            total += 1;
-            continue :block;
-        }
-        support: for (supports.keys()) |above_k| {
-            const above_v = map.get(above_k).?;
-            const min_z = above_v.a[0];
-            assert(min_z > 1);
-            var supported_by_other: bool = false;
-            for (above_v.a[1]..above_v.b[1]) |y| {
-                for (above_v.a[2]..above_v.b[2]) |x| {
-                    const below_id = grid[min_z - 1][y][x];
-                    assert(below_id != above_k);
-                    if (below_id == k or below_id == -1) {
-                        continue;
-                    }
-                    supported_by_other = true;
-                    continue :support;
-                }
-            }
-            if (!supported_by_other) {
-                continue :block;
-            }
-        }
-        // all supported blocks are supported by other
-        print("  disintegrate {c}\n", .{id_to_ch(k)});
-        total += 1;
     }
-
-    if (part2) {}
 
     return total;
 }
@@ -246,5 +264,5 @@ fn solve(input: []const u8, part2: bool) !usize {
 pub fn main() !void {
     const input = try u.getInput();
     print("{}\n", .{try solve(input, false)});
-    //print("{}\n", .{try solve(input, true)});
+    print("{}\n", .{try solve(input, true)});
 }
