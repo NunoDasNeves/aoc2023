@@ -62,28 +62,60 @@ pub fn StaticBuf(comptime Array: type) type {
     const Child = info.Array.child;
     return struct {
         storage: Array = std.mem.zeroes(Array),
-        buf: []Child = &.{},
+        len: usize = 0,
 
         pub fn append(self: *@This(), item: Child) bool {
-            if (self.buf.len >= self.storage.len) {
+            if (self.isFull()) {
                 return false;
             }
-            self.storage[self.buf.len] = item;
-            self.buf = self.storage[0 .. self.buf.len + 1];
+            self.storage[self.len] = item;
+            self.len += 1;
             return true;
         }
         pub fn orderedRemove(self: *@This(), i: usize) Child {
-            std.debug.assert(i < self.buf.len);
+            std.debug.assert(i < self.len);
+            const ret = self.storage[i];
             var j = i;
-            const ret = self.buf[i];
-            while (j < self.buf.len - 1) : (j += 1) {
-                self.buf[j] = self.buf[j + 1];
+            while (j < self.len - 1) : (j += 1) {
+                self.storage[j] = self.storage[j + 1];
             }
-            self.buf = self.storage[0 .. self.buf.len - 1];
+            self.len -= 1;
             return ret;
         }
         pub fn isFull(self: *@This()) bool {
-            return self.buf.len == self.storage.len;
+            return self.len == self.storage.len;
+        }
+        pub fn buf(self: *@This()) []Child {
+            return self.storage[0..self.len];
         }
     };
+}
+
+/// Converts between numeric types: .Enum, .Int and .Float.
+/// https://ziggit.dev/t/as-f32-value-expects-f32/2422/6
+pub inline fn as(comptime T: type, from: anytype) T {
+    switch (@typeInfo(@TypeOf(from))) {
+        .Enum => {
+            switch (@typeInfo(T)) {
+                .Int => return @intFromEnum(from),
+                else => @compileError(@typeName(@TypeOf(from)) ++ " can't be converted to " ++ @typeName(T)),
+            }
+        },
+        .Int => {
+            switch (@typeInfo(T)) {
+                .Enum => return @enumFromInt(from),
+                .Int => return @intCast(from),
+                .Float => return @floatFromInt(from),
+                else => @compileError(@typeName(@TypeOf(from)) ++ " can't be converted to " ++ @typeName(T)),
+            }
+        },
+        .Float => {
+            switch (@typeInfo(T)) {
+                .Float => return @floatCast(from),
+                .Int => return @intFromFloat(from),
+                else => @compileError(@typeName(@TypeOf(from)) ++ " can't be converted to " ++ @typeName(T)),
+            }
+        },
+        else => @compileError(@typeName(@TypeOf(from) ++ " is not supported.")),
+    }
 }
