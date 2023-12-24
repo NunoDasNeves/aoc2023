@@ -57,36 +57,51 @@ pub fn getInput() ![]const u8 {
     return std.fs.cwd().readFileAlloc(m, args[1], std.math.maxInt(usize));
 }
 
-pub fn StaticBuf(comptime Array: type) type {
-    const info = @typeInfo(Array);
-    const Child = info.Array.child;
+pub fn StaticBuf(comptime T: type, comptime size: usize) type {
+    const Array = [size]T;
+
     return struct {
-        storage: Array = std.mem.zeroes(Array),
+        buf: Array = std.mem.zeroes(Array),
         len: usize = 0,
 
-        pub fn append(self: *@This(), item: Child) bool {
+        pub fn append(self: *@This(), item: T) bool {
             if (self.isFull()) {
                 return false;
             }
-            self.storage[self.len] = item;
+            self.buf[self.len] = item;
             self.len += 1;
             return true;
         }
-        pub fn orderedRemove(self: *@This(), i: usize) Child {
+        pub fn orderedRemove(self: *@This(), i: usize) T {
             std.debug.assert(i < self.len);
-            const ret = self.storage[i];
+            const ret = self.buf[i];
             var j = i;
             while (j < self.len - 1) : (j += 1) {
-                self.storage[j] = self.storage[j + 1];
+                self.buf[j] = self.buf[j + 1];
             }
             self.len -= 1;
             return ret;
         }
-        pub fn isFull(self: *@This()) bool {
-            return self.len == self.storage.len;
+        pub fn swapRemove(self: *@This(), i: usize) T {
+            std.debug.assert(i < self.len);
+            const ret = self.buf[i];
+            self.buf[i] = self.buf[self.len - 1];
+            self.len -= 1;
+            return ret;
         }
-        pub fn buf(self: *@This()) []Child {
-            return self.storage[0..self.len];
+        pub fn isFull(self: *@This()) bool {
+            return self.len == self.buf.len;
+        }
+        pub fn slice(self: *@This()) []T {
+            return self.buf[0..self.len];
+        }
+        pub fn initFromSlice(s: []T) @This() {
+            var ret = @This(){};
+            std.debug.assert(s.len < ret.buf.len);
+            for (s) |el| {
+                std.debug.assert(ret.append(el));
+            }
+            return ret;
         }
     };
 }
