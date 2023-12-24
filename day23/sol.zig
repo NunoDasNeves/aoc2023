@@ -53,8 +53,8 @@ const Node = struct {
 };
 const NodeList = AL(Node);
 
-const StackEl = struct { node: NodeId, fork_num: usize, len: usize };
 const SeenMap = std.AutoArrayHashMap(NodeId, void);
+const StackEl = struct { node: NodeId, len: usize, done_fork: bool };
 
 fn getNeighbors(grid: [][]const u8, pos: [2]usize) u.StaticBuf(Neighbor, 4) {
     var ret = u.StaticBuf(Neighbor, 4){};
@@ -131,20 +131,6 @@ fn findNewNode(grid: [][]const u8, start: [2]usize, dir: Dir, part2: bool) ?stru
     unreachable;
 }
 
-fn printSeen(grid: [][]const u8, seen: SeenMap) void {
-    for (grid, 0..) |row, r| {
-        for (row, 0..) |ch, c| {
-            const p = .{ r, c };
-            if (seen.contains(p)) {
-                print("O", .{});
-            } else {
-                print("{c}", .{ch});
-            }
-        }
-        print("\n", .{});
-    }
-}
-
 fn solve(input: []const u8, part2: bool) !usize {
     const total: usize = 0;
     _ = total;
@@ -171,6 +157,7 @@ fn solve(input: []const u8, part2: bool) !usize {
         .ch = '.',
     }));
     var node_list = NodeList.init(heap);
+    var node_ids = AL(NodeId).init(heap);
     var node_map = AAHM([2]usize, NodeId).init(heap);
     var unfinished_nodes = AL(NodeId).init(heap);
     try node_list.append(start);
@@ -192,6 +179,7 @@ fn solve(input: []const u8, part2: bool) !usize {
                 } else {
                     const nn_id = node_list.items.len;
                     neighbor.node = nn_id;
+                    try node_ids.append(nn_id);
                     try node_list.append(nn.node);
                     try node_map.put(nn.node.pos, nn_id);
                     try unfinished_nodes.append(nn_id);
@@ -219,62 +207,45 @@ fn solve(input: []const u8, part2: bool) !usize {
     }
 
     // DFS stack
+    var seen = SeenMap.init(heap);
     var stack = AL(StackEl).init(heap);
-    // stack of all nodes visited in the currently exploring path
-    var seen_stack = AL(NodeId).init(heap);
-    // stack of fork path lens, used to compute path length (add em up)
-    var fork_len_stack = AL(usize).init(heap);
-    // everything seen, popped from when a fork is popped
-    var seen_map = SeenMap.init(heap);
     var max_path_len: usize = 0;
-    var fork_num: usize = 0;
-
-    try fork_len_stack.append(0);
-    try stack.append(.{ .node = 0, .fork_num = 0, .len = 0 });
-    try seen_stack.append(0);
-    try seen_map.put(0, undefined);
+    try stack.append(.{
+        .node = 0,
+        .len = 0,
+        .done_fork = false,
+    });
 
     while (stack.items.len > 0) {
-        const curr = stack.pop();
+        var curr = stack.pop();
 
+        if (curr.done_fork) {
+            assert(seen.swapRemove(curr.node));
+            continue;
+        }
         if (curr.node == end_id) {
-            var len: usize = 0;
-            for (fork_len_stack.items) |l| {
-                len += l;
-            }
-            len += curr.len;
             //print("found end with path len {}\n\n", .{len});
-            max_path_len = @max(len, max_path_len);
+            max_path_len = @max(curr.len, max_path_len);
+            continue;
         }
-
-        if (curr.fork_num > fork_num) {
-            //print("found new fork: {}, {}\n", .{ curr.fork_num, curr.node });
-        } else {
-            //print("trying another fork: {}, {any}, {c}\n", .{ curr.fork_num, curr.p, grid[curr.p[0]][curr.p[1]] });
-            //print("before:\n", .{});
-            //print("fork_lens: {any}\n", .{fork_len_stack.items});
-            //printSeen(grid, seen_map);
-            const num_forks_to_pop = fork_num - curr.fork_num + 1;
-            for (0..num_forks_to_pop) |_| {
-                _ = fork_len_stack.pop();
-                const p = seen_stack.pop();
-                assert(seen_map.swapRemove(p));
-            }
-            //print("after:\n", .{});
-            //print("fork_lens: {any}\n", .{fork_len_stack.items});
-            //printSeen(grid, seen_map);
+        if (seen.contains(curr.node)) {
+            continue;
         }
+        try seen.put(curr.node, undefined);
+        // mark end of exploring this fork
+        curr.done_fork = true;
+        try stack.append(curr);
 
-        // start/continue a fork
-        fork_num = curr.fork_num;
-        try fork_len_stack.append(curr.len);
-        try seen_map.put(curr.node, undefined);
-        try (seen_stack.append(curr.node));
-
+        // explore this fork
         var curr_node = node_list.items[curr.node];
         for (curr_node.neighbors.slice()) |n| {
-            if (seen_map.contains(n.node.?)) continue;
-            try stack.append(.{ .node = n.node.?, .fork_num = fork_num + 1, .len = n.len });
+            if (seen.contains(n.node.?)) {
+                continue;
+            }
+            //print("  {any}\n", .{n});
+            //if (curr.seen.contains(n.node.?)) continue;
+            const next = .{ .node = n.node.?, .len = curr.len + n.len, .done_fork = false };
+            try stack.append(next);
         }
     }
 
